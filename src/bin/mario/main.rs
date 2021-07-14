@@ -1,7 +1,8 @@
+use futures::future::join_all;
 use std::collections::HashMap;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    sync::oneshot,
+    sync::broadcast,
 };
 
 use provider::connector::{
@@ -11,22 +12,54 @@ use provider::connector::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = DockerClient::connect("/var/run/docker.sock");
+    let client = DockerClient::connect("/var/run/pouchd.sock");
     let container_list = client.list_containers().await?;
     let containers: HashMap<String, Container> = container_list
         .into_iter()
         .map(|c| (c.id.clone(), c))
         .collect();
-    let (tx, stop) = oneshot::channel::<()>();
+    let (tx, mut stop) = broadcast::channel::<()>(2);
     let watch_container_handler = tokio::spawn(async move {
-        tokio::select! {
-            _ = task_inner(&client) => { },
-            _ = stop => {
-                println!("stop");
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let list_container_result = client.list_containers().await;
+                    match list_container_result {
+                        Ok(containers) => {
+                            let container_details: Vec<_> = containers
+                                .iter()
+                                .map(|c| client.inspect(c.id.clone()))
+                                .collect();
+                            let result:Vec<_> = join_all(container_details)
+                            .await
+                            .into_iter()
+                            .filter(|x| x.is_ok())
+                            .map(|x| x.unwrap())
+                            .collect();
+                            // for container_result in result {
+                            //     match container_result {
+                            //         Ok(detail) => res.push(detail),
+                            //         Err(e) => println!("failed to inspect container {:?}", e),
+                            //     }
+                            // }
+                            println!("list containers {:?}", result);
+                        }
+                        Err(e) => {
+                            println!("failed to listcontainer {:?}", e);
+                        }
+                    }
+                },
+                _ = stop.recv() => {
+                    println!("stop");
+                    break;
+                }
             }
         }
     });
-    let collect_handler = tokio::spawn(collect());
+
+    let rx2 = tx.subscribe();
+    let collect_handler = tokio::spawn(collect(rx2));
     let timeout_handle = tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(12)).await;
         tx.send(()).unwrap();
@@ -37,57 +70,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn task_inner(client: &DockerClient) {
+async fn collect(mut stop: tokio::sync::broadcast::Receiver<()>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
     loop {
-        interval.tick().await;
-        let list_container_result = client.list_containers().await;
-        match list_container_result {
-            Ok(containers) => {
-                let container_details: Vec<_> = containers
-                    .iter()
-                    .map(|c| client.inspect(c.id.clone()))
-                    .collect();
-                let mut res = Vec::<ContainerDetail>::new();
-                for task in container_details {
-                    match task.await {
-                        Ok(detail) => res.push(detail),
-                        Err(e) => println!("failed to inspect container {:?}", e),
+        tokio::select! {
+            _ = interval.tick() => {
+                let proc_stat = tokio::fs::File::open("/proc/stat").await.unwrap();
+                let buf_reader = BufReader::new(proc_stat);
+                let mut lines = buf_reader.lines();
+                while let Some(line) = lines.next_line().await.unwrap() {
+                    if line.starts_with("cpu ") {
+                        let part = line[5..].split(" ").collect::<Vec<_>>();
+                        println!("usr {}, nice {}, sys {}, idle {}, iowait {}, hardirq {}, softirq {}, steal {}, guest {}", part[0], part[1], part[2], part[3], part[4], part[5], part[6], part[7], part[8]);
+                        break;
                     }
                 }
-                println!("list containers {:?}", res);
+                let number_of_cpus = get_number_of_cpus().await.unwrap();
+                println!("number of cpu {}", number_of_cpus);
             }
-            Err(e) => {
-                println!("failed to listcontainer {:?}", e);
+            _ = stop.recv() => {
+                println!("stop collect");
+                break;
             }
         }
     }
 }
 
-async fn collect() {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
-    loop {
-        interval.tick().await;
-        let proc_stat = tokio::fs::File::open("/proc/stat").await.unwrap();
-        let buf_reader = BufReader::new(proc_stat);
-        let mut lines = buf_reader.lines();
-        while let Some(line) = lines.next_line().await.unwrap() {
-            if line.starts_with("cpu ") {
-                let part = line[5..].split(" ").collect::<Vec<_>>();
-                println!("usr {}, nice {}, sys {}, idle {}, iowait {}, hardirq {}, softirq {}, steal {}, guest {}", part[0], part[1], part[2], part[3], part[4], part[5], part[6], part[7], part[8]);
-                break;
-            }
+async fn get_number_of_cpus() -> std::io::Result<u32> {
+    let cpuinfo = tokio::fs::File::open("/proc/cpuinfo").await?;
+    let buf_reader = BufReader::new(cpuinfo);
+    let mut lines = buf_reader.lines();
+    let mut number_of_cpus = 0_u32;
+    while let Some(line) = lines.next_line().await? {
+        if line.starts_with("processor\t:") {
+            number_of_cpus = number_of_cpus + 1;
         }
-
-        let cpuinfo = tokio::fs::File::open("/proc/cpuinfo").await.unwrap();
-        let buf_reader = BufReader::new(cpuinfo);
-        let mut lines = buf_reader.lines();
-        let mut number_of_cpus = 0;
-        while let Some(line) = lines.next_line().await.unwrap() {
-            if line.starts_with("processor\t:") {
-                number_of_cpus = number_of_cpus + 1;
-            }
-        }
-        println!("number of cpu {}", number_of_cpus);
     }
+    Ok(number_of_cpus)
 }

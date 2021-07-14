@@ -5,8 +5,8 @@ pub enum DockerAPIError {
     #[error("invalid api response message {message:?}, status {status_code:?}")]
     InvalidApiResponse {
         status_code: String,
-        message: String
+        message: String,
     },
     #[error("unknown error")]
-    OtherError(#[from] anyhow::Error)
+    OtherError(#[from] anyhow::Error),
 }

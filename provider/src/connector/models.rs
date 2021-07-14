@@ -6,8 +6,8 @@ pub struct Container {
     pub id: String,
     #[serde(rename = "Names")]
     pub names: Vec<String>,
-    #[serde(rename = "State")]
-    pub state: String,
+    // #[serde(rename = "State")]
+    // pub state: String,
     #[serde(rename = "Status")]
     pub status: String,
 }
