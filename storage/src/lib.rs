@@ -19,7 +19,8 @@ fn write_to_db() -> Result<(), Box<dyn std::error::Error>> {
     let cpu_cf = db.cf_handle("cpu").unwrap();
     for i in 0..1000 {
         let container_id = (i - i % 20) / 20;
-        let key = format!("{}@container{:04}", get_current_timestamp(), container_id);
+        let key =
+            format!("{}@container{:04}", get_current_timestamp(), container_id);
         println!("put key {}", key);
         db.put_cf(cpu_cf, key.as_bytes(), (i as f64).to_le_bytes())?;
         if i % 50 == 0 {
@@ -56,7 +57,10 @@ fn read_from_db() -> Result<(), Box<dyn std::error::Error>> {
     let it = db.iterator_cf_opt(
         cpu_cf,
         readopts,
-        rocksdb::IteratorMode::From("1625897002".as_bytes(), rocksdb::Direction::Forward),
+        rocksdb::IteratorMode::From(
+            "1625897002".as_bytes(),
+            rocksdb::Direction::Forward,
+        ),
     );
 
     let values: Vec<_> = it

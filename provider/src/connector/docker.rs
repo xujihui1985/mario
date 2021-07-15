@@ -18,10 +18,7 @@ pub type DockerAPIResult<T> = Result<T, DockerAPIError>;
 impl DockerClient {
     pub fn connect<T: Into<String>>(p: T) -> Self {
         let unix = Client::unix();
-        let client = DockerClient {
-            sock_path: p.into(),
-            client: unix,
-        };
+        let client = DockerClient { sock_path: p.into(), client: unix };
         client
     }
 
@@ -47,8 +44,15 @@ impl DockerClient {
         Ok(status.is_success())
     }
 
-    pub async fn inspect(&self, id: impl Into<String>) -> DockerAPIResult<ContainerDetail> {
-        let url = Uri::new(&self.sock_path, &format!("/containers/{}/json", id.into())).into();
+    pub async fn inspect(
+        &self,
+        id: impl Into<String>,
+    ) -> DockerAPIResult<ContainerDetail> {
+        let url = Uri::new(
+            &self.sock_path,
+            &format!("/containers/{}/json", id.into()),
+        )
+        .into();
         let response = self.client.get(url).await.unwrap();
         let status = response.status();
         if !status.is_success() {
