@@ -7,6 +7,8 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 provider = {path = "provider"}
+collector = {path = "collector"}
+storage = {path = "storage"}
 clap = "2.31.0"
 futures = "0.3"
 
@@ -14,5 +16,6 @@ futures = "0.3"
 members = [
     "core",
     "storage",
-    "provider"
+    "provider",
+    "collector"
 ]

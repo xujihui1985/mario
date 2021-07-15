@@ -1,13 +1,12 @@
 [package]
-name = "storage"
+name = "collector"
 version = "0.1.0"
+authors = ["Sean <xujihui1985@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[dependencies]
-async-trait = "0.1.50"
 
-[dependencies.rocksdb]
-version = "0.16.0"
-default-features = false
-features = ["lz4"]
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1.50"
+storage = {path = "../storage"}
