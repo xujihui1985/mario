@@ -1,5 +1,8 @@
+use std::sync::Arc;
+use serde::Serialize;
+
 use async_trait::async_trait;
-use storage::Collector;
+use mario_core::Collector;
 use tokio::{
     fs,
     io::{AsyncBufReadExt, BufReader},
@@ -9,7 +12,7 @@ pub struct MemCollector {
     pub name: String,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct MemStat {
     pub totalkb: u64,
     pub freekb: u64,
@@ -18,21 +21,33 @@ pub struct MemStat {
     pub avaliablekb: u64,
 }
 
+impl MemCollector {
+    pub fn new() -> Self {
+        MemCollector { name: String::from("mem") }
+    }
+}
+
 #[async_trait]
 impl Collector for MemCollector {
     fn get_name(&self) -> String {
         self.name.clone()
     }
 
-    async fn collect(&self) {
+    async fn collect(
+        &self,
+        db: Arc<rocksdb::DBWithThreadMode<rocksdb::MultiThreaded>>,
+        batch: &mut rocksdb::WriteBatch,
+    ) {
         let meminfo = fs::File::open("/proc/meminfo").await.unwrap();
         let buf_reader = BufReader::new(meminfo);
         let mut lines = buf_reader.lines();
-        let mut stat: MemStat = Default::default();
+        let mut stat = MemStat::default();
         while let Some(line) = lines.next_line().await.unwrap() {
             if line.starts_with("MemTotal:") {
-                let part =
-                    line[9..].trim_start().split(char::is_whitespace).collect::<Vec<_>>()[0];
+                let part = line[9..]
+                    .trim_start()
+                    .split(char::is_whitespace)
+                    .collect::<Vec<_>>()[0];
                 stat.totalkb = part.parse().unwrap();
             }
             if line.starts_with("MemFree:") {
@@ -56,7 +71,9 @@ impl Collector for MemCollector {
                 stat.avaliablekb = part.parse().unwrap();
             }
         }
-
-        println!("collect mem {:?}", stat);
+        let cf = db.cf_handle(&self.get_name()).unwrap();
+        let value = serde_json::to_vec(&stat).unwrap();
+        let key = mario_core::get_current_timestamp().to_string();
+        batch.put_cf(cf, key.as_bytes(), &value[..]);
     }
 }
