@@ -19,6 +19,10 @@ impl RegistryInner {
         let collect_name = c.get_name();
         self.collectors_by_name.remove(&collect_name);
     }
+
+    fn collectors(&self) -> Vec<String> {
+        self.collectors_by_name.keys().map(|f| f.to_owned()).collect()
+    }
 }
 
 impl std::fmt::Debug for RegistryInner {
@@ -55,6 +59,10 @@ impl Registry {
     pub fn unregister(&self, c: Box<dyn Collector>) {
         self.inner.write().unwrap().unregister(c)
     }
+
+    pub fn collectors(&self) -> Vec<String> {
+        self.inner.read().unwrap().collectors()
+    }
 }
 
 lazy_static! {
@@ -64,4 +72,29 @@ lazy_static! {
 pub fn default_registry() -> &'static Registry {
     lazy_static::initialize(&DEFAULT_REGISTRY);
     &DEFAULT_REGISTRY
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::cpu::CPUCollector;
+
+    #[test]
+    fn test_registry() {
+        let r = Registry::new();
+        let collector = CPUCollector::new();
+        r.register(Box::new(collector));
+        assert_eq!(r.collectors().len(), 1);
+    }
+
+
+    #[test]
+    fn test_default_registry() {
+        DEFAULT_REGISTRY.register(Box::new(CPUCollector::new()));
+        assert_eq!(DEFAULT_REGISTRY.collectors().len(), 1);
+
+        DEFAULT_REGISTRY.unregister(Box::new(CPUCollector::new()));
+        assert_eq!(DEFAULT_REGISTRY.collectors().len(), 0);
+    }
 }
