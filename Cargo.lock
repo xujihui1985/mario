@@ -125,6 +125,7 @@ name = "collector"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "lazy_static",
  "mario-core",
  "rocksdb",
  "serde",
