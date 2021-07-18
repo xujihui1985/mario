@@ -22,7 +22,7 @@ impl App {
         App { collectors: collectors, interval_seconds: 5, db: Arc::new(db) }
     }
 
-    async fn collect(&self) {
+    async fn collect(&self, mut stop: tokio::sync::broadcast::Receiver<()>) {
         let mut interval = tokio::time::interval(
             std::time::Duration::from_secs(self.interval_seconds),
         );
@@ -36,10 +36,9 @@ impl App {
                     self.db.write(batch).unwrap();
                     println!("save stats");
                 }
-                // _ = stop.recv() => {
-                //     println!("stop collect");
-                //     break;
-                // }
+                _ = stop.recv() => {
+                    break;
+                }
             }
         }
     }
@@ -72,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arc_app = Arc::new(app);
     let arc_app = arc_app.clone();
     tokio::spawn(async move {
-        arc_app.collect().await;
+        arc_app.collect(rx2).await;
     });
 
     // let collect_handle = tokio::spawn(collect(5, collectors, rx2));
