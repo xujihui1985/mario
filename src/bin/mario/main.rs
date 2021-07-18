@@ -1,5 +1,5 @@
 use futures::future::join_all;
-use rocksdb::{WriteBatch, DB};
+use rocksdb::WriteBatch;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -31,7 +31,7 @@ impl App {
                 _ = interval.tick() => {
                     let mut batch = WriteBatch::default();
                     for clt in &self.collectors {
-                        clt.collect(self.db.clone(), &mut batch).await;
+                        clt.collect(self.db.clone(), &mut batch);
                     }
                     self.db.write(batch).unwrap();
                     println!("save stats");
@@ -70,15 +70,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new(db);
     let arc_app = Arc::new(app);
     let arc_app = arc_app.clone();
-    tokio::spawn(async move {
+    let collect_handle = tokio::spawn(async move {
         arc_app.collect(rx2).await;
     });
 
-    // let collect_handle = tokio::spawn(collect(5, collectors, rx2));
     let timeout_handle = tokio::spawn(sleep(tx)); // tokio spawn must be a future
-    watch_container_handle.await?;
-    timeout_handle.await?;
-    // collect_handle.await?;
+    tokio::join!(watch_container_handle, timeout_handle, collect_handle);
     Ok(())
 }
 
@@ -110,7 +107,6 @@ async fn watch_containers(
                 }
             },
             _ = stop.recv() => {
-                println!("stop");
                 break;
             }
         }
@@ -121,31 +117,3 @@ async fn sleep(tx: tokio::sync::broadcast::Sender<()>) {
     tokio::time::sleep(std::time::Duration::from_secs(12)).await;
     tx.send(()).unwrap();
 }
-
-// async fn collect(
-//     interval_seconds: u64,
-//     collectors: Vec<Box<dyn mario_core::Collector>>,
-//     mut stop: tokio::sync::broadcast::Receiver<()>,
-// ) {
-//     let mut interval =
-//         tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
-//     loop {
-//         tokio::select! {
-//             _ = interval.tick() => {
-//                 let mut batch = WriteBatch::default();
-//                 batch.put_cf(cf, key, value)
-//                 for clt in &collectors {
-//                     let cf = db.cf_handle(clt.get_name()).unwrap();
-//                     clt.collect(|k, v| {
-//                         batch.put_cf(cf, k, v);
-//                     }).await;
-//                 }
-//                 db.write(batch);
-//             }
-//             _ = stop.recv() => {
-//                 println!("stop collect");
-//                 break;
-//             }
-//         }
-//     }
-// }

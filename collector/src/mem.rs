@@ -1,12 +1,10 @@
-use std::sync::Arc;
 use serde::Serialize;
-
-use async_trait::async_trait;
-use mario_core::Collector;
-use tokio::{
-    fs,
-    io::{AsyncBufReadExt, BufReader},
+use std::{
+    io::{BufRead, BufReader},
+    sync::Arc,
 };
+
+use mario_core::Collector;
 
 pub struct MemCollector {
     pub name: String,
@@ -27,22 +25,22 @@ impl MemCollector {
     }
 }
 
-#[async_trait]
 impl Collector for MemCollector {
     fn get_name(&self) -> String {
         self.name.clone()
     }
 
-    async fn collect(
+    fn collect(
         &self,
         db: Arc<rocksdb::DBWithThreadMode<rocksdb::MultiThreaded>>,
         batch: &mut rocksdb::WriteBatch,
     ) {
-        let meminfo = fs::File::open("/proc/meminfo").await.unwrap();
+        let meminfo = std::fs::File::open("/proc/meminfo").unwrap();
         let buf_reader = BufReader::new(meminfo);
-        let mut lines = buf_reader.lines();
         let mut stat = MemStat::default();
-        while let Some(line) = lines.next_line().await.unwrap() {
+        for line in buf_reader.lines() {
+            let line = line.unwrap();
+
             if line.starts_with("MemTotal:") {
                 let part = line[9..]
                     .trim_start()
@@ -71,6 +69,7 @@ impl Collector for MemCollector {
                 stat.avaliablekb = part.parse().unwrap();
             }
         }
+
         let cf = db.cf_handle(&self.get_name()).unwrap();
         let value = serde_json::to_vec(&stat).unwrap();
         let key = mario_core::get_current_timestamp().to_string();
