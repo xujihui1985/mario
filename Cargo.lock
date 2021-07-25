@@ -12,12 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
-
-[[package]]
 name = "async-trait"
 version = "0.1.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -131,17 +125,12 @@ name = "collector"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "storage",
+ "lazy_static",
+ "mario-core",
+ "rocksdb",
+ "serde",
+ "serde_json",
  "tokio",
-]
-
-[[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "thiserror",
 ]
 
 [[package]]
@@ -424,9 +413,19 @@ dependencies = [
  "clap",
  "collector",
  "futures",
+ "mario-core",
  "provider",
+ "rocksdb",
  "storage",
  "tokio",
+]
+
+[[package]]
+name = "mario-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "rocksdb",
 ]
 
 [[package]]
@@ -720,7 +719,6 @@ dependencies = [
 name = "storage"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "rocksdb",
 ]
 

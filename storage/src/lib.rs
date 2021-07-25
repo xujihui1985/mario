@@ -2,16 +2,8 @@ use std::{
     convert::TryInto,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use async_trait::async_trait;
 
 use rocksdb::DB;
-
-#[async_trait]
-pub trait Collector: Sync + Send{
-    async fn collect(&self);
-    fn get_name(&self) -> String;
-}
-
 
 fn write_to_db() -> Result<(), Box<dyn std::error::Error>> {
     // let path = DBPath::new("testpath", 10 << 20)?;
@@ -70,6 +62,7 @@ fn read_from_db() -> Result<(), Box<dyn std::error::Error>> {
             rocksdb::Direction::Forward,
         ),
     );
+
 
     let values: Vec<_> = it
         .filter(|(k, _)| {

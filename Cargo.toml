@@ -9,12 +9,18 @@ tokio = { version = "1", features = ["full"] }
 provider = {path = "provider"}
 collector = {path = "collector"}
 storage = {path = "storage"}
+mario-core = {path = "mario-core"}
 clap = "2.31.0"
 futures = "0.3"
 
+[dependencies.rocksdb]
+version = "0.16.0"
+default-features = false
+features = ["lz4"]
+
 [workspace]
 members = [
-    "core",
+    "mario-core",
     "storage",
     "provider",
     "collector"

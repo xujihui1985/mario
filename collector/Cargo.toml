@@ -9,4 +9,13 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1.50"
-storage = {path = "../storage"}
+mario-core = {path = "../mario-core"}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+lazy_static = "1.4.0"
+
+
+[dependencies.rocksdb]
+version = "0.16.0"
+default-features = false
+features = ["lz4"]
